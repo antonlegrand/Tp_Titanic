@@ -1,47 +1,61 @@
 ---
-title: "Analyse du taux de survie sur le Titanic"
-author: "Votre Nom"
+title: "Taux de survie sur le Titanic : utilisation du package TitanicPackage"
+author: "Antoine Legrand"
 date: "`r format(Sys.Date(), '%d/%m/%Y')`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    theme: flatly
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-library(Titanic)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 6.5, fig.height = 4)
+library(TitanicPackage)   # notre package, qui fournit taux_survie()
 library(ggplot2)
+library(knitr)
+
 data("TitanicSurvival", package = "carData")
-df <- TitanicSurvival
+titanic <- TitanicSurvival
+
+# Calculs faits avec la fonction du package
+res_sexe   <- taux_survie(titanic, "sex", survie = "survived")
+res_classe <- taux_survie(titanic, "passengerClass", survie = "survived")
 ```
 
-## Données
+## Objectif
 
-```{r}
-str(df)
-```
+Ce rapport calcule le taux de survie des passagers du Titanic avec la fonction `taux_survie()` du package **TitanicPackage**, sur **`r nrow(titanic)` passagers**.
 
 ## Taux de survie par sexe
 
 ```{r}
-res_sexe <- taux_survie(df, "sex")
-knitr::kable(res_sexe)
+# Taux en pourcentage pour l'affichage
+tab <- res_sexe; tab$taux_survie <- paste0(round(100 * tab$taux_survie, 1), " %")
+kable(tab, col.names = c("Sexe", "Passagers", "Survivants", "Taux de survie"))
 ```
+
+Les femmes survivent à **`r round(100 * res_sexe$taux_survie[res_sexe$sex == "female"], 1)` %** (339 sur 466) contre **`r round(100 * res_sexe$taux_survie[res_sexe$sex == "male"], 1)` %** pour les hommes (161 sur 843), soit près de quatre fois plus.
 
 ## Taux de survie par classe
 
 ```{r}
-res_classe <- taux_survie(df, "passengerClass")
-knitr::kable(res_classe)
+tab <- res_classe; tab$taux_survie <- paste0(round(100 * tab$taux_survie, 1), " %")
+kable(tab, col.names = c("Classe", "Passagers", "Survivants", "Taux de survie"))
 ```
 
-## Visualisation
-
 ```{r}
+# Histogramme du taux de survie par classe
 ggplot(res_classe, aes(x = passengerClass, y = taux_survie, fill = passengerClass)) +
-  geom_col() +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(round(100 * taux_survie, 1), " %")), vjust = -0.4) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.75)) +
   labs(x = "Classe", y = "Taux de survie") +
   theme_minimal()
 ```
 
+Le taux décroît nettement avec la classe : 61,9 % en 1re, 43,0 % en 2e et 25,5 % en 3e. La 3e classe est aussi la plus nombreuse (709 passagers).
+
 ## Conclusion
 
-Les femmes et les passagers de 1re classe ont un taux de survie nettement plus élevé.
+Le sexe et la classe jouent fortement sur la survie. Les femmes et les passagers de 1re classe ont les meilleures chances. Ces résultats sont identiques à ceux de l'analyse détaillée du fichier `TP.Rmd`, ce qui valide la fonction du package. Ils restent descriptifs : sexe et classe sont liés entre eux.
