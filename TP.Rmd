@@ -1,0 +1,122 @@
+---
+title: "Analyse des survivants du Titanic"
+author: "Antoine Legrand"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+library(carData)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+```
+
+# 1. Chargement et présentation des données
+
+```{r donnees}
+data("TitanicSurvival")
+df <- TitanicSurvival
+df$passager <- NULL
+head(df)
+str(df)
+```
+
+Le jeu de données `TitanicSurvival` (package `carData`) décrit 1309 passagers du Titanic :
+
+- `survived` : survie (no / yes)
+- `sex` : sexe (female / male)
+- `age` : âge en années (certaines valeurs sont manquantes)
+- `passengerClass` : classe du billet (1st, 2nd, 3rd)
+
+```{r aide, eval=FALSE}
+?TitanicSurvival
+```
+
+# 2. Statistiques descriptives
+
+```{r stats}
+summary(df)
+cat("Valeurs manquantes d'âge :", sum(is.na(df$age)), "\n")
+```
+
+```{r tableaux}
+# Taux de survie global
+kable(round(prop.table(table(df$survived)) * 100, 1),
+      col.names = c("Survie", "%"))
+
+# Âge : statistiques par statut de survie
+df %>%
+  group_by(survived) %>%
+  summarise(n = n(),
+            age_moyen = round(mean(age, na.rm = TRUE), 1),
+            age_median = median(age, na.rm = TRUE),
+            ecart_type = round(sd(age, na.rm = TRUE), 1)) %>%
+  kable()
+```
+
+# 3. Survie selon le sexe
+
+```{r sexe}
+kable(round(prop.table(table(df$sex, df$survived), margin = 1) * 100, 1),
+      caption = "Part de survivants (%) par sexe")
+
+ggplot(df, aes(x = sex, fill = survived)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Répartition des survivants selon le sexe",
+       x = "Sexe", y = "Proportion", fill = "Survécu") +
+  theme_minimal()
+```
+
+# 4. Survie selon la classe
+
+```{r classe}
+kable(round(prop.table(table(df$passengerClass, df$survived), margin = 1) * 100, 1),
+      caption = "Part de survivants (%) par classe")
+
+ggplot(df, aes(x = passengerClass, fill = survived)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Répartition des survivants selon la classe",
+       x = "Classe", y = "Proportion", fill = "Survécu") +
+  theme_minimal()
+```
+
+# 5. Âge selon la survie
+
+```{r age}
+ggplot(df, aes(x = survived, y = age, fill = survived)) +
+  geom_boxplot(alpha = 0.7, na.rm = TRUE) +
+  labs(title = "Âge selon la survie", x = "Survécu", y = "Âge") +
+  theme_minimal() + theme(legend.position = "none")
+
+ggplot(df, aes(x = age, fill = survived)) +
+  geom_histogram(bins = 30, alpha = 0.6, position = "identity", na.rm = TRUE) +
+  labs(title = "Distribution de l'âge", x = "Âge", y = "Effectif") +
+  theme_minimal()
+```
+
+```{r tests}
+chisq.test(table(df$sex, df$survived))
+chisq.test(table(df$passengerClass, df$survived))
+t.test(age ~ survived, data = df)
+```
+
+# 6. Interprétation
+
+- **Survie globale** : environ 38 % des passagers ont survécu.
+- **Sexe** : c'est le facteur le plus marqué. Les femmes survivent environ 3 à 4 fois plus que les hommes (autour de 73 % contre 19 %). Cela correspond à la consigne « les femmes et les enfants d'abord ».
+- **Classe** : la survie décroît avec la classe, d'environ 62 % en 1re classe à 26 % en 3e. Les passagers de 1re classe étaient plus proches des canots.
+- **Âge** : les survivants sont un peu plus jeunes en moyenne, mais l'écart est faible. Les enfants ont eu de meilleures chances, ce que l'histogramme montre.
+- **Tests** : les tests du χ² sur le sexe et la classe sont très significatifs (p < 0,05). Le test t sur l'âge est à lire avec prudence, car il y a des valeurs manquantes.
+- **Limites** : ces liens sont descriptifs. Le sexe, la classe et l'âge sont corrélés entre eux, donc on ne peut pas parler de causalité. Une régression logistique permettrait de mesurer l'effet de chaque variable « toutes choses égales par ailleurs ».
