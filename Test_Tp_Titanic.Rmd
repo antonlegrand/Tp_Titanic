@@ -1,0 +1,47 @@
+---
+title: "Analyse du taux de survie sur le Titanic"
+author: "Votre Nom"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(Titanic)
+library(ggplot2)
+data("TitanicSurvival", package = "carData")
+df <- TitanicSurvival
+```
+
+## Données
+
+```{r}
+str(df)
+```
+
+## Taux de survie par sexe
+
+```{r}
+res_sexe <- taux_survie(df, "sex")
+knitr::kable(res_sexe)
+```
+
+## Taux de survie par classe
+
+```{r}
+res_classe <- taux_survie(df, "passengerClass")
+knitr::kable(res_classe)
+```
+
+## Visualisation
+
+```{r}
+ggplot(res_classe, aes(x = passengerClass, y = taux_survie, fill = passengerClass)) +
+  geom_col() +
+  labs(x = "Classe", y = "Taux de survie") +
+  theme_minimal()
+```
+
+## Conclusion
+
+Les femmes et les passagers de 1re classe ont un taux de survie nettement plus élevé.
