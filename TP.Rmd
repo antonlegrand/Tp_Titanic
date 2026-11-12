@@ -1,0 +1,127 @@
+---
+title: "Analyse des survivants du Titanic"
+author: "Antoine Legrand"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+# echo = FALSE : le code n'apparaît pas dans le HTML
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4)
+library(carData); library(dplyr); library(ggplot2); library(knitr)
+
+# Chargement du jeu de données (1309 passagers)
+data("TitanicSurvival", package = "carData")
+titanic <- TitanicSurvival   # nom "titanic" pour ne pas masquer la fonction df()
+
+# Indicateurs réutilisés dans le texte
+taux_global <- round(100 * mean(titanic$survived == "yes"), 1)
+na_age      <- sum(is.na(titanic$age))
+tab_sexe    <- round(100 * prop.table(table(titanic$sex, titanic$survived), 1), 1)
+tab_classe  <- round(100 * prop.table(table(titanic$passengerClass, titanic$survived), 1), 1)
+khi_sexe    <- chisq.test(table(titanic$sex, titanic$survived))
+khi_classe  <- chisq.test(table(titanic$passengerClass, titanic$survived))
+test_age    <- t.test(age ~ survived, data = titanic)
+```
+
+## Les données
+
+Le jeu `TitanicSurvival` (package carData) décrit **1309 passagers** : survie, sexe, âge et classe du billet. L'âge est manquant pour `r na_age` passagers, ces lignes sont ignorées dans les calculs sur l'âge.
+
+## Survie globale
+
+```{r}
+# Part de survivants / non-survivants
+kable(round(100 * prop.table(table(titanic$survived)), 1),
+      col.names = c("Survie", "Part (%)"))
+```
+
+Environ **`r taux_global` %** des passagers ont survécu.
+
+```{r}
+# Statistiques de l'âge selon la survie
+titanic %>% group_by(survived) %>%
+  summarise(n = n(),
+            age_moyen = round(mean(age, na.rm = TRUE), 1),
+            age_median = median(age, na.rm = TRUE),
+            ecart_type = round(sd(age, na.rm = TRUE), 1)) %>%
+  kable(col.names = c("Survie", "Effectif", "Âge moyen", "Âge médian", "Écart-type"))
+```
+
+## Survie selon le sexe
+
+```{r}
+kable(tab_sexe, caption = "Part de survivants par sexe (%)")
+```
+
+```{r}
+# Barres empilées à 100% pour comparer les proportions
+ggplot(titanic, aes(x = sex, fill = survived)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Répartition des survivants selon le sexe",
+       x = "Sexe", y = "Proportion", fill = "Survie") +
+  theme_minimal()
+```
+
+Le sexe est le facteur le plus marqué : **`r tab_sexe["female","yes"]` %** des femmes survivent contre **`r tab_sexe["male","yes"]` %** des hommes. La consigne « les femmes et les enfants d'abord » se retrouve dans les données.
+
+## Survie selon la classe
+
+```{r}
+kable(tab_classe, caption = "Part de survivants par classe (%)")
+```
+
+```{r}
+ggplot(titanic, aes(x = passengerClass, fill = survived)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Répartition des survivants selon la classe",
+       x = "Classe", y = "Proportion", fill = "Survie") +
+  theme_minimal()
+```
+
+La survie diminue avec la classe : **`r tab_classe["1st","yes"]` %** en 1re, `r tab_classe["2nd","yes"]` % en 2e et **`r tab_classe["3rd","yes"]` %** en 3e. Les passagers de 1re classe étaient plus proches des canots.
+
+## Âge et survie
+
+```{r}
+# Boîtes à moustaches : médiane et dispersion de l'âge par groupe
+ggplot(titanic, aes(x = survived, y = age, fill = survived)) +
+  geom_boxplot(alpha = 0.7, na.rm = TRUE) +
+  labs(title = "Âge selon la survie", x = "Survie", y = "Âge") +
+  theme_minimal() + theme(legend.position = "none")
+```
+
+```{r}
+# Distribution de l'âge : met en évidence les enfants
+ggplot(titanic, aes(x = age, fill = survived)) +
+  geom_histogram(bins = 30, alpha = 0.6, position = "identity", na.rm = TRUE) +
+  labs(title = "Distribution de l'âge", x = "Âge", y = "Effectif", fill = "Survie") +
+  theme_minimal()
+```
+
+Les survivants sont un peu plus jeunes en moyenne, mais l'écart est faible. Les enfants ont eu de meilleures chances, ce que l'histogramme montre.
+
+## Tests statistiques
+
+```{r}
+tests <- data.frame(
+  Test = c("Khi-deux : sexe x survie", "Khi-deux : classe x survie"),
+  Statistique = round(c(khi_sexe$statistic, khi_classe$statistic), 1),
+  ddl = c(khi_sexe$parameter, khi_classe$parameter),
+  p_value = format.pval(c(khi_sexe$p.value, khi_classe$p.value), eps = 1e-16)
+)
+kable(tests, col.names = c("Test", "Statistique", "ddl", "p-value"))
+```
+
+Les liens entre survie et sexe, puis entre survie et classe, sont **très significatifs** (p < 0,05). Le test t sur l'âge donne une p-value de `r format.pval(test_age$p.value, digits = 2)`. Il est à lire avec prudence à cause des valeurs manquantes.
+
+## Limites
+
+Ces résultats sont descriptifs. Le sexe, la classe et l'âge sont corrélés entre eux, donc on ne peut pas parler de causalité. Une régression logistique mesurerait l'effet de chaque variable toutes choses égales par ailleurs.
