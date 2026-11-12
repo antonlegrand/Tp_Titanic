@@ -1,31 +1,41 @@
 #' Taux de survie selon une variable
 #'
-#' Calcule le taux de survie des passagers du Titanic pour chaque
-#' modalité d'une variable (sexe, classe, etc.).
+#' Calcule, pour chaque modalité d'une variable (sexe, classe...),
+#' l'effectif, le nombre de survivants et le taux de survie.
 #'
-#' @param data Un data.frame contenant une colonne de survie.
-#' @param variable Nom de la variable de regroupement (chaîne de caractères).
-#' @param survie Nom de la colonne de survie, codée 0/1. Par défaut "Survived".
+#' @param data Un data.frame contenant les données des passagers.
+#' @param variable Nom de la colonne de regroupement (texte).
+#' @param survie Nom de la colonne de survie. Par défaut "survived".
 #'
-#' @return Un data.frame avec la modalité, l'effectif, le nombre de
-#'   survivants et le taux de survie.
+#' @return Un data.frame avec la modalité, n, survivants et taux_survie.
 #' @export
 #'
 #' @examples
-#' df <- data.frame(Survived = c(1, 0, 1, 0), Sex = c("F", "M", "F", "M"))
-#' taux_survie(df, "Sex")
-taux_survie <- function(data, variable, survie = "Survived") {
+#' titanic <- carData::TitanicSurvival
+#' taux_survie(titanic, "sex")
+taux_survie <- function(data, variable, survie = "survived") {
+
+  # Vérification : les deux colonnes doivent exister dans les données
   if (!variable %in% names(data)) stop("Variable introuvable : ", variable)
   if (!survie %in% names(data)) stop("Colonne de survie introuvable : ", survie)
 
-  agg <- aggregate(
-    data[[survie]],
-    by = list(modalite = data[[variable]]),
-    FUN = function(x) c(n = length(x),
-                        survivants = sum(x, na.rm = TRUE),
-                        taux = mean(x, na.rm = TRUE))
-  )
-  res <- data.frame(agg$modalite, agg$x)
-  names(res) <- c(variable, "n", "survivants", "taux_survie")
+  # Conversion de la survie en vrai/faux, quel que soit son codage
+  s <- data[[survie]]
+  if (is.factor(s) || is.character(s)) {
+    s <- tolower(as.character(s)) %in% c("yes", "oui", "1", "true")
+  } else {
+    s <- as.numeric(s) == 1
+  }
+
+  # Calcul par groupe : effectif, survivants, puis taux
+  grp <- data[[variable]]
+  n <- tapply(s, grp, length)
+  surv <- tapply(s, grp, sum)
+
+  # Assemblage du résultat, avec taux arrondi à 3 décimales
+  res <- data.frame(modalite = names(n), n = as.integer(n),
+                    survivants = as.integer(surv),
+                    taux_survie = round(as.numeric(surv / n), 3))
+  names(res)[1] <- variable
   res
 }
